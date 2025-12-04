@@ -1,0 +1,226 @@
+---
+title: "Data Wrangling Final Project"
+author: "Connor Toomey"
+format:
+  html:
+    toc: true
+    toc-location: left
+    theme: superhero
+    highlight-style: breeze
+    self-contained: true
+engine: python3
+---
+## Our Data
+
+For this project I am looking at "Travel_Test.csv" Data & "Travel_Train.csv" Data. The data comes from an airline passenger satisfaction survey in an effort to better predict the satisfaction of a customer. The dataset includes variables such as "Gender", "Customer Type", "Age", "Class", "Departure Delay in Minutes", & "Arrival Delay in Minutes". Both sets of data are displaying customers that were surveyed. I hope to look at different factors that show a relationship with the overall satisfaction of fliers in this set. 
+
+``` {python}
+import pandas as pd
+
+test_data = pd.read_csv('/Users/connortoomey/Desktop/Mod2 Data Wrangling/GitHub/Data_Wrangling_Project/Travel_Test.csv')
+
+test_data.shape
+test_data.columns
+test_data.head()
+```
+
+```{python}
+train_data = pd.read_csv('/Users/connortoomey/Desktop/Mod2 Data Wrangling/GitHub/Data_Wrangling_Project/Travel_Train.csv')
+
+train_data.shape
+train_data.columns
+train_data.head()
+```
+
+Here I am combining the datasets via Concatinating the test_data underneath the train_data so that all of the data is in one place. 
+
+```{python}
+combo_data = pd.concat([train_data, test_data], axis=0, ignore_index=True)
+```
+
+```{python}
+combo_data.head()
+```
+
+
+I am going to make a scatterplot of the level of satisfaction based on Departure Delay by flight classes. This will be our basis for our questions and analysis of our Flights. Satisfation level being satisfied is our desired outcome.
+
+
+```{python}
+from plotnine import *
+plot1 = (ggplot(combo_data, 
+                aes(x='satisfaction',
+                y = 'Departure Delay in Minutes'))
+                + geom_point(alpha = .3)
+                + facet_wrap('Class')
+                +theme_minimal())
+
+plot1
+```
+
+## Question 1
+
+How dissatisfied will a passenger be due to a delay in departure?
+
+### Answer 1
+
+First, I used my merged dataset, combo_data to get the data column "satisfaction" to be binary instead of string variables. 
+
+```{python}
+combo_data['satisfaction_binary'] = combo_data['satisfaction'].apply(
+    lambda x: 1 if str(x).lower().strip() == "satisfied" else 0
+)
+
+```
+
+I then made and ran a logistic regression model to find how the satisfaction level changes based on a Departure Delay in Minutes. The results for this were quite interesting. In the model that I ran, we get a -0.0030 coefficient and a -18.036 z score. This indicates that we have a negative relationship with satisfaction and Departure Delay in Minutes. We can also see that for every minute that goes by with a delay in the planes departure the probability of being dissatisfied goes up a little bit more each minute. 
+
+```{python}
+import statsmodels.api as sm
+
+model1 = sm.formula.logit('satisfaction_binary ~ Q("Departure Delay in Minutes")', data= combo_data).fit()
+
+model1.summary()
+```
+
+Next, I made a Logistic Regression Curve Plot that displays the probability of satisfaction as the departure delay increases minute by minute. As you can see, the longer the delay the less satisfied the passenger is going to be. 
+
+```{python}
+import numpy as np 
+
+beta0 = -0.2210
+beta1 = -0.0030
+
+delay = np.linspace(0, 200, 500)
+logit = beta0 + beta1 * delay
+prob = 1 / (1 + np.exp(-logit))
+
+delay_prob = pd.DataFrame({
+    "delay": delay,
+    "prob": prob
+})
+
+plot2 = (ggplot(delay_prob, aes(x="delay", y="prob"))
+    + geom_line(size=1.2)
+    + labs(
+        x="Departure Delay in Minutes",
+        y="Predicted Probability of Satisfaction",
+        title="Logistic Regression Curve\nProbability of Satisfaction vs Departure Delay"
+    )
+    + theme_minimal()
+)
+
+plot2
+```
+
+## Question 2
+
+Is there a positive connection between Class and Satisfaction on these flights? 
+
+## Answer 2 
+
+I made another Logistic Regression Model and got some interesting results. Using Female as a baseline, I was able to find that Males are satisfied about 45.3% of the time based on the coefficients. 
+
+```{python}
+
+model2 = sm.formula.logit('satisfaction_binary ~ Gender', data= combo_data).fit()
+
+model2.summary()
+```
+
+I then wanted to look at a summary of the satisfaction, so I made a new dataframe by grouping combo_data by Gender and then set it to aggregate by the 'sum', 'count', and 'mean' of the satisfaction_binary column of the combo_data dataframe. Following that, I ran a heatmap visual to show the breakdown of satisfaction by gender (shown below). As the logistic model showed us, the Male Gender had a higher level of satisfaction based on the flight data. There are multiple factors that can go into this. Additionally, we can see that it is not a clear split or sum of 100%. This occurs because our satisfaction_binary has 0 as both neutral or dissatisfied. 
+
+```{python}
+satisfaction_summary = combo_data.groupby('Gender').agg({
+    'satisfaction_binary': ['sum', 'count', 'mean']
+}).reset_index()
+satisfaction_summary.columns = ['Gender', 'Satisfied_Count', 'Total_Count', 'Proportion_Satisfied']
+
+# Plotnine visualization for model2
+plot3 = (ggplot(satisfaction_summary, aes(x='Gender', y='Proportion_Satisfied', fill='Gender'))
+    + geom_tile(alpha=0.7)
+    + geom_text(aes(label=round(satisfaction_summary['Proportion_Satisfied'], 3)), va='bottom', size=12)
+    + labs(
+        x='Gender',
+        y='Proportion Satisfied',
+        title='Logistic Regression Results: Satisfaction by Gender'
+    )
+    + theme_minimal()
+)
+
+plot3
+```
+
+## Question 3
+
+Lastly, which passenger class is the most satisfied?
+
+## Answer 3
+
+I ran one last logistic regression to see what class and the best satisfaction. Based on the results, business class had the most satisfaction, followed by Economy Plus, and then Economy. The business class had a 0.8209 coefficient with the other classes having negative coefficients to Business Class. This indicates a negative relationship to satisfaction based on not being in business class.
+
+```{python}
+
+model3 = sm.formula.logit('satisfaction_binary ~ Class', data= combo_data).fit()
+
+model3.summary()
+
+```
+
+From the logistic regression model, I then made a new data frame that gives a unique value to each class so that we can visualize things better. After that I then made predicted probability of satisfaction based on model3 and then put that into the plot. The plot also backs up the logistic regression by showing the high probability of satisfaction in Business class compared to the other classes.
+
+```{python}
+
+class_vals = pd.DataFrame({
+    "Class": combo_data["Class"].unique()
+})
+
+class_vals["pred_prob"] = model3.predict(class_vals)
+
+plot3 = (ggplot(class_vals, aes(x='Class', y='pred_prob'))
+    + geom_col()
+    + labs(
+        x="Class",
+        y="Predicted Probability",
+        title="Predicted Satisfaction Probability by Travel Class"
+    )
+    + theme_minimal()
+)
+
+plot3
+```
+
+After plotting everything, I wanted to try testing one more thing so I made a Random Forest based on Class and Satisfaction. 
+
+```{python}
+from sklearn.ensemble import RandomForestClassifier
+
+X = combo_data[['Class']]
+y = combo_data['satisfaction_binary']
+
+X = pd.get_dummies(X, drop_first=True)
+
+rf = RandomForestClassifier(n_estimators=500, random_state=42)
+rf.fit(X, y)
+
+```
+
+The last thing that I did, I converted the feature importances to a series and sorted everything in descending order. Then I converted the series back into a dataframe and reset the index before cleaning the data slightly by removing "class_" from things so that it was more easy to read. Following these steps I plotted my final plot to visualize the random forest features. Between the two classes that the forest made up, Economy was more important than the Economy Plus by a huge margin. 
+
+```{python}
+fi = (pd.Series(rf.feature_importances_, index=X.columns)
+      .sort_values(ascending=False)
+      .reset_index()
+      .rename(columns={'index':'Feature', 0:'Importance'}))
+fi['Label'] = fi['Feature'].str.replace('Class_', '', regex=False)
+fi['lbl'] = fi['Importance'].round(3).astype(str)
+
+plot4 = (ggplot(fi, aes(x='reorder(Label, Importance)', y='Importance', fill='Label'))
+ + geom_col()
+ + coord_flip()
+ + labs(x='Class', y='Feature Importance', title='Random Forest Feature Importance by Class')
+ + theme_minimal()
+)
+
+plot4
+```
