@@ -54,7 +54,7 @@ plot1 = (ggplot(combo_data,
                 + facet_wrap('Class')
                 +theme_minimal())
 
-plot1
+plot1.show()
 ```
 
 ## Question 1
@@ -112,7 +112,7 @@ plot2 = (ggplot(delay_prob, aes(x="delay", y="prob"))
     + theme_minimal()
 )
 
-plot2
+plot2.show()
 ```
 
 ## Question 2
@@ -152,7 +152,7 @@ plot3 = (ggplot(satisfaction_summary, aes(x='Gender', y='Proportion_Satisfied', 
     + theme_minimal()
 )
 
-plot3
+plot3.show()
 
 ```
 
@@ -175,6 +175,8 @@ model3.summary()
 From the logistic regression model, I then made a new data frame that gives a unique value to each class so that we can visualize things better. After that I then made predicted probability of satisfaction based on model3 and then put that into the plot. The plot also backs up the logistic regression by showing the high probability of satisfaction in Business class compared to the other classes.
 
 ```{python}
+#| messages: false
+#| warnings: false
 
 class_vals = pd.DataFrame({
     "Class": combo_data["Class"].unique()
@@ -192,12 +194,14 @@ plot3 = (ggplot(class_vals, aes(x='Class', y='pred_prob'))
     + theme_minimal()
 )
 
-plot3
+plot3.show()
 ```
 
 After plotting everything, I wanted to try testing one more thing so I made a Random Forest based on Class and Satisfaction. 
 
 ```{python}
+#| messages: false
+#| warnings: false
 from sklearn.ensemble import RandomForestClassifier
 
 X = combo_data[['Class']]
@@ -206,13 +210,15 @@ y = combo_data['satisfaction_binary']
 X = pd.get_dummies(X, drop_first=True)
 
 rf = RandomForestClassifier(n_estimators=500, random_state=42)
-rf.fit(X, y)
+rf_fit = rf.fit(X, y)
 
 ```
 
 The last thing that I did, I converted the feature importances to a series and sorted everything in descending order. Then I converted the series back into a dataframe and reset the index before cleaning the data slightly by removing "class_" from things so that it was more easy to read. Following these steps I plotted my final plot to visualize the random forest features. Between the two classes that the forest made up, Economy was more important than the Economy Plus by a huge margin. 
 
 ```{python}
+#| messages: false
+#| warnings: false
 fi = (pd.Series(rf.feature_importances_, index=X.columns)
       .sort_values(ascending=False)
       .reset_index()
@@ -227,7 +233,7 @@ plot4 = (ggplot(fi, aes(x='reorder(Label, Importance)', y='Importance', fill='La
  + theme_minimal()
 )
 
-plot4
+plot4.show()
 ```
 
 
